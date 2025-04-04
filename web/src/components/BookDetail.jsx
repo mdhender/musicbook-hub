@@ -11,9 +11,6 @@ export default function BookDetail({ token }) {
     const [book, setBook] = useState(null);
     const [error, setError] = useState(null);
 
-    const baseButton = "text-white font-semibold px-4 py-2 rounded focus:outline-none";
-
-
     useEffect(() => {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 

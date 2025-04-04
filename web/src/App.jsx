@@ -12,14 +12,6 @@ import EditBookForm from "./components/EditBookForm";
 function App() {
     const [books, setBooks] = useState([]);
     const [token, setToken] = useState(localStorage.getItem("token") || null);
-    const [form, setForm] = useState({
-        title: "",
-        author: "",
-        instrument: "",
-        condition: "",
-        description: "",
-        public: false, // default to private
-    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -41,42 +33,6 @@ function App() {
             .catch(err => setError(err))
             .finally(() => setLoading(false));
     }, [token]);
-
-    function handleInput(e) {
-        const {name, type, value, checked} = e.target;
-        setForm(prev => ({
-            ...prev,
-            [name]: type === "checkbox" ? checked : value,
-        }));
-    }
-
-    function addBook(e) {
-        e.preventDefault();
-        fetch(API_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify(form),
-        })
-            .then(res => {
-                if (res.status === 401) throw new Error("Not authorized");
-                return res.json();
-            })
-            .then(book => {
-                setBooks(prev => [...prev, book]);
-                setForm({
-                    title: "",
-                    author: "",
-                    instrument: "",
-                    condition: "",
-                    description: "",
-                    public: false
-                });
-            })
-            .catch(err => alert("Failed to add book: " + err.message));
-    }
 
     function deleteBook(id) {
         fetch(`${API_URL}/${id}`, {
@@ -149,13 +105,9 @@ function App() {
                             path="/"
                             element={
                                 <>
-                                    <LoginForm token={token} login={login} logout={logout} />
+                                    <LoginForm token={token} login={login} logout={logout}/>
 
-                                    <AddBookForm
-                                        form={form}
-                                        handleInput={handleInput}
-                                        addBook={addBook}
-                                    />
+                                    {token && <AddBookForm token={token} setBooks={setBooks} />}
 
                                     {/* Status Messages */}
                                     <div className="space-y-2">
@@ -166,13 +118,6 @@ function App() {
                                             <p className="text-red-600">
                                                 Error loading books. Please try again later.
                                             </p>
-                                        )}
-                                        {/* Book Count */}
-                                        {!loading && !error && books.length !== 0 && (
-                                            <p className="text-sm text-gray-500 mb-2">{books.length} book(s) visible</p>
-                                        )}
-                                        {!loading && !error && books.length === 0 && (
-                                            <p className="text-gray-500 italic">No books available.</p>
                                         )}
 
                                         <BookList
@@ -187,8 +132,8 @@ function App() {
                                 </>
                             }
                         />
-                        <Route path="/books/:id" element={<BookDetail token={token} />} />
-                        <Route path="/books/:id/edit" element={<EditBookForm token={token} />} />
+                        <Route path="/books/:id" element={<BookDetail token={token}/>}/>
+                        <Route path="/books/:id/edit" element={<EditBookForm token={token}/>}/>
                     </Routes>
                 </div>
             </div>
