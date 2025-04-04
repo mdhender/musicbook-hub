@@ -1,0 +1,11 @@
+# .air.toml
+root = "."
+tmp_dir = "build"
+
+[build]
+  cmd = "go build -o ./build/musicbook-hub"
+  bin = "./build/musicbook-hub"
+  include_ext = ["go"]
+  exclude_dir = ["web", "tmp"]
+  exclude_file = []
+  delay = 1000 # in milliseconds

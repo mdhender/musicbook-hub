@@ -1,0 +1,19 @@
+[Unit]
+Description=Musicbooks Web Service
+StartLimitIntervalSec=0
+After=network-online.target
+
+[Service]
+Type=simple
+User=mbooks
+Group=mbooks
+PIDFile=/run/mbooks-damned.dev.pid
+WorkingDirectory=/var/www/damned.dev/data
+Environment=PORT=8181
+ExecStart=/var/www/damned.dev/bin/musicbook-hub start server
+ExecReload=/bin/kill -USR1 $MAINPID
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
