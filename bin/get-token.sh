@@ -36,3 +36,10 @@ curl -s -H "Authorization: Bearer $TOKEN" "$URL/api/me" | jq .
 echo
 echo "📚 Fetching all books (including private)..."
 curl -s -H "Authorization: Bearer $TOKEN" "$URL/api/books" | jq .
+
+echo
+echo "📤 Exporting books from /api/books/export..."
+curl -s -H "Authorization: Bearer $TOKEN" "$URL/api/books/export" | jq .
+
+echo
+echo "✅ Export complete."

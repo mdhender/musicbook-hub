@@ -1,5 +1,5 @@
 .DS_Store
 .idea/
-books.json
+books.db
 magic-keys.json
 node_modules/

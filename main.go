@@ -20,18 +20,9 @@ func main() {
 	}
 
 	if err := loadBooks(); err != nil {
-		log.Printf("%s: failed to load: %v", booksFile, err)
-		if os.IsNotExist(err) {
-			log.Printf("%s: 📂 not found — creating new empty collection", booksFile)
-			books = []Book{}
-			if saveErr := saveBooks(); saveErr != nil {
-				log.Fatalf("%s: ❌ failed to create: %v", booksFile, saveErr)
-			}
-		} else {
-			log.Fatalf("%s: ❌ failed to load: %v", booksFile, err)
-		}
+		log.Fatalf("%s: failed to load: %v", dbPath, err)
 	} else {
-		log.Printf("%s: ✅ loaded %d books\n", booksFile, len(books))
+		log.Printf("%s: ✅ loaded books store\n", dbPath)
 	}
 
 	mux := http.NewServeMux()
@@ -41,8 +32,10 @@ func main() {
 	mux.HandleFunc("GET /api/me", requireAuth(meHandler))
 
 	// Books endpoints
-	mux.HandleFunc("GET /api/books", booksHandler)                     // public read
-	mux.HandleFunc("POST /api/books", requireAuth(booksHandler))       // protected write
+	mux.HandleFunc("GET /api/books", booksHandler)               // public read
+	mux.HandleFunc("POST /api/books", requireAuth(booksHandler)) // protected write
+	mux.HandleFunc("GET /api/books/export", booksExportHandler)
+	mux.HandleFunc("GET /api/books/{id}", bookByIDHandler)
 	mux.HandleFunc("DELETE /api/books/{id}", requireAuth(bookHandler)) // protected delete
 	mux.HandleFunc("PATCH /api/books/{id}", requireAuth(updateBookHandler))
 

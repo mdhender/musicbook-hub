@@ -3,21 +3,23 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
+	_ "modernc.org/sqlite"
 	"net/http"
 	"os"
 	"strconv"
-	"sync"
 )
 
 type Book struct {
-	ID         int    `json:"id"`
-	Title      string `json:"title"`
-	Author     string `json:"author"`
-	Instrument string `json:"instrument"`
-	Condition  string `json:"condition"`
-	Public     bool   `json:"public"` // ✅ New field
+	ID          int64  `json:"id"`
+	Title       string `json:"title"`
+	Author      string `json:"author"`
+	Instrument  string `json:"instrument"`
+	Condition   string `json:"condition"`
+	Description string `json:"description"`
+	Public      bool   `json:"public"` // ✅ New field
 }
 
 type BookListResponse struct {
@@ -25,13 +27,10 @@ type BookListResponse struct {
 	Count int    `json:"count"`
 }
 
-const booksFile = "books.json"
+const dbPath = "books.db"
 
 var (
-	books          = []Book{}
-	nextID         = 1
-	booksMutex     = &sync.Mutex{}
-	booksFileMutex = &sync.Mutex{}
+	db *sql.DB
 )
 
 func booksHandler(w http.ResponseWriter, r *http.Request) {
@@ -40,18 +39,14 @@ func booksHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		booksMutex.Lock()
-		defer booksMutex.Unlock()
-
-		var filtered []Book
 		auth := isAuthenticated(r)
 
-		for _, b := range books {
-			if b.Public || auth {
-				filtered = append(filtered, b)
-			}
+		filtered, err := listBooks(auth)
+		if err != nil {
+			log.Printf("%s %s: failed to list books: %v\n", r.Method, r.URL.Path, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-
 		if filtered == nil {
 			filtered = []Book{}
 		}
@@ -63,19 +58,22 @@ func booksHandler(w http.ResponseWriter, r *http.Request) {
 		})
 
 	case http.MethodPost:
+		if !isAuthenticated(r) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 		var b Book
 		if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		booksMutex.Lock()
-		defer booksMutex.Unlock()
-		b.ID = nextID
-		nextID++
-		books = append(books, b)
-		nextID++
-		_ = saveBooks() // ✅
-		books = append(books, b)
+		var err error
+		b.ID, err = addBook(b)
+		if err != nil {
+			log.Printf("%s %s: failed to add book: %v\n", r.Method, r.URL.Path, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(b)
 
@@ -93,6 +91,11 @@ func bookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !isAuthenticated(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -100,19 +103,66 @@ func bookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	booksMutex.Lock()
-	defer booksMutex.Unlock()
-
-	for i, b := range books {
-		if b.ID == id {
-			books = append(books[:i], books[i+1:]...)
-			_ = saveBooks() // ✅
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+	err = deleteBook(id)
+	if err != nil {
+		log.Printf("%s %s: failed to delete book: %v\n", r.Method, r.URL.Path, err)
+		http.Error(w, "Book not found", http.StatusNotFound)
+		//log.Printf("%s %s: failed to delete book: %v\n", r.Method, r.URL.Path, err)
+		//http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	http.Error(w, "Book not found", http.StatusNotFound)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func bookByIDHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	enableCORS(w)
+
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid book ID", http.StatusBadRequest)
+		return
+	}
+
+	book, err := getBookByID(id)
+	if err != nil {
+		log.Printf("%s %s: error finding book: %v\n", r.Method, r.URL.Path, err)
+		http.Error(w, "Book not found", http.StatusNotFound)
+		return
+	}
+	if book == nil {
+		http.Error(w, "Book not found", http.StatusNotFound)
+		return
+	}
+
+	if !book.Public && !isAuthenticated(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(book)
+}
+
+func booksExportHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	enableCORS(w)
+
+	auth := isAuthenticated(r)
+
+	books, err := listBooks(auth)
+	if err != nil {
+		log.Printf("%s %s: failed to list books: %v\n", r.Method, r.URL.Path, err)
+		http.Error(w, "Failed to export books", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", "attachment; filename=books-export.json")
+	_ = json.NewEncoder(w).Encode(books)
 }
 
 func updateBookHandler(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +171,11 @@ func updateBookHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPatch {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !isAuthenticated(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -134,75 +189,138 @@ func updateBookHandler(w http.ResponseWriter, r *http.Request) {
 	var update struct {
 		Public *bool `json:"public"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
 	if update.Public == nil {
 		http.Error(w, "Missing 'public' field", http.StatusBadRequest)
 		return
 	}
 
-	booksMutex.Lock()
-	defer booksMutex.Unlock()
+	b, err := getBookByID(id)
+	if err != nil {
+		log.Printf("%s %s: book %q not found\n", r.Method, r.URL.Path, r.PathValue("id"))
+		log.Printf("%s %s: failed to find book: %v\n", r.Method, r.URL.Path, err)
+		http.Error(w, "Book not found", http.StatusNotFound)
+		return
+	}
+	b.Public = *update.Public
 
-	for i, b := range books {
-		if b.ID == id {
-			books[i].Public = *update.Public
-			_ = saveBooks() // ✅
-
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(books[i])
-			return
-		}
+	err = updateBook(*b)
+	if err != nil {
+		log.Printf("%s %s: failed to update book: %v\n", r.Method, r.URL.Path, err)
+		http.Error(w, "Failed to update book", http.StatusInternalServerError)
+		return
 	}
 
-	log.Printf("%s %s: book %q not found\n", r.Method, r.URL.Path, r.PathValue("id"))
-
-	http.Error(w, "Book not found", http.StatusNotFound)
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(b)
 }
 
 func loadBooks() error {
-	booksFileMutex.Lock()
-	defer booksFileMutex.Unlock()
+	// Check if the DB file exists
+	_, err := os.Stat(dbPath)
+	isNew := os.IsNotExist(err)
 
-	file, err := os.ReadFile(booksFile)
+	db, err = sql.Open("sqlite", dbPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			books = []Book{}
-			return nil
-		}
-		return err
+		log.Fatalf("failed to open database: %v", err)
 	}
 
-	tmp := []Book{}
-	err = json.Unmarshal(file, &tmp)
-	if err != nil {
-		return err
-	}
-	books = tmp
-
-	// Recalculate nextID based on existing books
-	nextID = 1
-	for _, b := range books {
-		if b.ID >= nextID {
-			nextID = b.ID + 1
+	if isNew {
+		if err := createSchema(); err != nil {
+			log.Fatalf("failed to create schema: %v", err)
 		}
+		log.Println("created new database and schema")
 	}
 
 	return nil
 }
 
-func saveBooks() error {
-	booksFileMutex.Lock()
-	defer booksFileMutex.Unlock()
+func createSchema() error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS books (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		title       TEXT NOT NULL,
+		author      TEXT NOT NULL DEFAULT '',
+		instrument  TEXT NOT NULL DEFAULT '',
+		condition   TEXT NOT NULL DEFAULT '',
+		description TEXT NOT NULL DEFAULT '',
+		public      INTEGER NOT NULL DEFAULT 0 CHECK (public in (0, 1))
+	);
+	`
+	_, err := db.Exec(schema)
+	return err
+}
 
-	data, err := json.MarshalIndent(books, "", "  ")
+func addBook(book Book) (int64, error) {
+	result, err := db.Exec(`
+		INSERT INTO books (title, author, instrument, condition, description, public)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		book.Title, book.Author, book.Instrument, book.Condition, book.Description, book.Public,
+	)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	log.Printf("%s: 💾 saving %d books\n", booksFile, len(books))
-	return os.WriteFile(booksFile, data, 0644)
+	return result.LastInsertId()
+}
+
+func updateBook(book Book) error {
+	_, err := db.Exec(`
+		UPDATE books
+		SET title = ?, author = ?, instrument = ?, condition = ?, description = ?, public = ?
+		WHERE id = ?`,
+		book.Title, book.Author, book.Instrument, book.Condition, book.Description, book.Public, book.ID,
+	)
+	return err
+}
+
+func deleteBook(id int) error {
+	_, err := db.Exec(`DELETE FROM books WHERE id = ?`, id)
+	return err
+}
+
+func listBooks(isAuth bool) ([]Book, error) {
+	rows, err := db.Query(`SELECT id, title, author, instrument, condition, description, public FROM books`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var books []Book
+	for rows.Next() {
+		var b Book
+		var public int64
+		err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.Instrument, &b.Condition, &b.Description, &public)
+		if err != nil {
+			return nil, err
+		}
+		b.Public = public == 1
+		// filter books based on public field or if authenticated
+		if b.Public || isAuth {
+			books = append(books, b)
+		}
+	}
+	if books == nil {
+		books = []Book{}
+	}
+	return books, rows.Err()
+}
+
+func getBookByID(id int) (*Book, error) {
+	row := db.QueryRow(`SELECT id, title, author, instrument, condition, description, public FROM books WHERE id = ?`, id)
+
+	var b Book
+	var public int64
+	err := row.Scan(&b.ID, &b.Title, &b.Author, &b.Instrument, &b.Condition, &b.Description, &public)
+	if err == sql.ErrNoRows {
+		return nil, nil // not found
+	}
+	if err != nil {
+		return nil, err
+	}
+	b.Public = public == 1
+	return &b, nil
 }
