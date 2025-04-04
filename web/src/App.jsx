@@ -71,7 +71,8 @@ function App() {
                     author: "",
                     instrument: "",
                     condition: "",
-                    public: true
+                    description: "",
+                    public: false
                 });
             })
             .catch(err => alert("Failed to add book: " + err.message));
