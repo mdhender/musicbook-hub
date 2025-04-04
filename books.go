@@ -97,7 +97,7 @@ func bookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid book ID", http.StatusBadRequest)
 		return
@@ -120,7 +120,7 @@ func bookByIDHandler(w http.ResponseWriter, r *http.Request) {
 	enableCORS(w)
 
 	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid book ID", http.StatusBadRequest)
 		return
@@ -184,15 +184,36 @@ func updateBookHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid book ID", http.StatusBadRequest)
 		return
 	}
+	// log.Printf("%s %s: id %q: %d\n", r.Method, r.URL.Path, idStr, id)
 
-	var updated Book
+	var updated struct {
+		Public *bool `json:"public"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
-	updated.ID = id
+	if updated.Public == nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	log.Printf("updated: %+v\n", updated)
+	// fetch the book from the database
+	book, err := getBookByID(id)
+	if err != nil {
+		log.Printf("%s %s: failed to get book: %v\n", r.Method, r.URL.Path, err)
+		http.Error(w, "Book not found", http.StatusNotFound)
+		return
+	} else if book == nil {
+		// log.Printf("%s %s: failed to find book\n", r.Method, r.URL.Path)
+		http.Error(w, "Book not found", http.StatusNotFound)
+		return
+	}
+	log.Printf("fetch: book %+v\n", *book)
+	book.Public = *updated.Public
+	log.Printf("updated: book %+v\n", *book)
 
-	if err := updateBook(updated); err != nil {
+	if err := updateBook(*book); err != nil {
 		// log.Printf("%s %s: failed to update book: %v\n", r.Method, r.URL.Path, err)
 		http.Error(w, "Failed to update book", http.StatusInternalServerError)
 		return
@@ -200,7 +221,7 @@ func updateBookHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(updated)
+	_ = json.NewEncoder(w).Encode(book)
 }
 
 func loadBooks() error {
@@ -252,6 +273,7 @@ func addBook(book Book) (int64, error) {
 }
 
 func updateBook(book Book) error {
+	log.Printf("updateBook: %+v\n", book)
 	_, err := db.Exec(`
 		UPDATE books
 		SET title = ?, author = ?, instrument = ?, condition = ?, description = ?, public = ?
@@ -261,7 +283,7 @@ func updateBook(book Book) error {
 	return err
 }
 
-func deleteBook(id int) error {
+func deleteBook(id int64) error {
 	_, err := db.Exec(`DELETE FROM books WHERE id = ?`, id)
 	return err
 }
@@ -293,7 +315,7 @@ func listBooks(isAuth bool) ([]Book, error) {
 	return books, rows.Err()
 }
 
-func getBookByID(id int) (*Book, error) {
+func getBookByID(id int64) (*Book, error) {
 	row := db.QueryRow(`SELECT id, title, author, instrument, condition, description, public FROM books WHERE id = ?`, id)
 
 	var b Book

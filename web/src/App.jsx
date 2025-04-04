@@ -18,7 +18,7 @@ function App() {
         instrument: "",
         condition: "",
         description: "",
-        public: true, // default to public
+        public: false, // default to private
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
