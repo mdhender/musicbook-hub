@@ -2,10 +2,11 @@
 import {useEffect, useState} from "react";
 import {BrowserRouter as Router, Link, Route, Routes} from "react-router-dom";
 import {API_URL, LOGIN_URL} from "./config.js";
-import BookDetail from "./BookDetail";
 import LoginForm from "./components/LoginForm";
-import AddBookForm from "./components/AddBookForm";
 import BookList from "./components/BookList";
+import BookDetail from "./components/BookDetail";
+import AddBookForm from "./components/AddBookForm";
+import EditBookForm from "./components/EditBookForm";
 
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         author: "",
         instrument: "",
         condition: "",
+        description: "",
         public: true, // default to public
     });
     const [loading, setLoading] = useState(true);
@@ -185,6 +187,7 @@ function App() {
                             }
                         />
                         <Route path="/books/:id" element={<BookDetail token={token} />} />
+                        <Route path="/books/:id/edit" element={<EditBookForm token={token} />} />
                     </Routes>
                 </div>
             </div>

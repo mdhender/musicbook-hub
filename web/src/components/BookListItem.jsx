@@ -12,6 +12,9 @@ export default function BookListItem({ book, token, toggleVisibility, deleteBook
                 {book.author && (
                     <div className="text-sm text-gray-600">by {book.author}</div>
                 )}
+                {book.description && (
+                    <div className="text-sm text-gray-700 mt-1">{book.description}</div>
+                )}
                 {token && (
                     <div
                         className="text-sm mt-1 cursor-pointer"

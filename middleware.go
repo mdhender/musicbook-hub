@@ -3,7 +3,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
@@ -48,7 +47,7 @@ func isAuthenticated(r *http.Request) bool {
 }
 
 func optionsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 	w.WriteHeader(http.StatusOK)
 }

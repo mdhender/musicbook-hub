@@ -32,6 +32,13 @@ export default function AddBookForm({ form, handleInput, addBook }) {
                 value={form.condition}
                 onChange={handleInput}
             />
+            <textarea
+                className="w-full p-2 border rounded"
+                placeholder="Description (optional)"
+                name="description"
+                value={form.description}
+                onChange={handleInput}
+            />
             <label className="flex items-center space-x-2">
                 <input
                     type="checkbox"
@@ -42,7 +49,7 @@ export default function AddBookForm({ form, handleInput, addBook }) {
                 <span>Public</span>
             </label>
             <button
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
                 type="submit"
             >
                 Add Book

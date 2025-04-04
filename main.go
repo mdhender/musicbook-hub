@@ -40,13 +40,13 @@ func main() {
 	mux.HandleFunc("PATCH /api/books/{id}", requireAuth(updateBookHandler))
 
 	mux.HandleFunc("OPTIONS /{rest...}", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s: pre-flight\n", r.Method, r.URL.Path)
+		// log.Printf("%s %s: pre-flight\n", r.Method, r.URL.Path)
 		enableCORS(w)
 		w.WriteHeader(http.StatusNoContent)
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s: not found\n", r.Method, r.URL.Path)
+		// log.Printf("%s %s: not found\n", r.Method, r.URL.Path)
 		enableCORS(w)
 		http.Error(w, "generic not found", http.StatusNotFound)
 	})

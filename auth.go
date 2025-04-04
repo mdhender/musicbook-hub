@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -62,7 +61,7 @@ func isValidMagicUUID(id uuid.UUID) bool {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
 	idStr := r.PathValue("uuid")
@@ -90,7 +89,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func meHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
 	// Extract token from Authorization header

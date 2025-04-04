@@ -19,7 +19,7 @@ type Book struct {
 	Instrument  string `json:"instrument"`
 	Condition   string `json:"condition"`
 	Description string `json:"description"`
-	Public      bool   `json:"public"` // ✅ New field
+	Public      bool   `json:"public"`
 }
 
 type BookListResponse struct {
@@ -34,7 +34,7 @@ var (
 )
 
 func booksHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
 	switch r.Method {
@@ -43,7 +43,7 @@ func booksHandler(w http.ResponseWriter, r *http.Request) {
 
 		filtered, err := listBooks(auth)
 		if err != nil {
-			log.Printf("%s %s: failed to list books: %v\n", r.Method, r.URL.Path, err)
+			// log.Printf("%s %s: failed to list books: %v\n", r.Method, r.URL.Path, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -70,7 +70,7 @@ func booksHandler(w http.ResponseWriter, r *http.Request) {
 		var err error
 		b.ID, err = addBook(b)
 		if err != nil {
-			log.Printf("%s %s: failed to add book: %v\n", r.Method, r.URL.Path, err)
+			// log.Printf("%s %s: failed to add book: %v\n", r.Method, r.URL.Path, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -83,7 +83,7 @@ func booksHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func bookHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
 	if r.Method != http.MethodDelete {
@@ -105,9 +105,9 @@ func bookHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = deleteBook(id)
 	if err != nil {
-		log.Printf("%s %s: failed to delete book: %v\n", r.Method, r.URL.Path, err)
+		// log.Printf("%s %s: failed to delete book: %v\n", r.Method, r.URL.Path, err)
 		http.Error(w, "Book not found", http.StatusNotFound)
-		//log.Printf("%s %s: failed to delete book: %v\n", r.Method, r.URL.Path, err)
+		//// log.Printf("%s %s: failed to delete book: %v\n", r.Method, r.URL.Path, err)
 		//http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -116,7 +116,7 @@ func bookHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func bookByIDHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
 	idStr := r.PathValue("id")
@@ -128,7 +128,7 @@ func bookByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	book, err := getBookByID(id)
 	if err != nil {
-		log.Printf("%s %s: error finding book: %v\n", r.Method, r.URL.Path, err)
+		// log.Printf("%s %s: error finding book: %v\n", r.Method, r.URL.Path, err)
 		http.Error(w, "Book not found", http.StatusNotFound)
 		return
 	}
@@ -148,14 +148,14 @@ func bookByIDHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func booksExportHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
 	auth := isAuthenticated(r)
 
 	books, err := listBooks(auth)
 	if err != nil {
-		log.Printf("%s %s: failed to list books: %v\n", r.Method, r.URL.Path, err)
+		// log.Printf("%s %s: failed to list books: %v\n", r.Method, r.URL.Path, err)
 		http.Error(w, "Failed to export books", http.StatusInternalServerError)
 		return
 	}
@@ -166,57 +166,41 @@ func booksExportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateBookHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
+	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
 	if r.Method != http.MethodPatch {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 	if !isAuthenticated(r) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid book ID", http.StatusBadRequest)
 		return
 	}
 
-	var update struct {
-		Public *bool `json:"public"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	var updated Book
+	if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
-	if update.Public == nil {
-		http.Error(w, "Missing 'public' field", http.StatusBadRequest)
-		return
-	}
+	updated.ID = id
 
-	b, err := getBookByID(id)
-	if err != nil {
-		log.Printf("%s %s: book %q not found\n", r.Method, r.URL.Path, r.PathValue("id"))
-		log.Printf("%s %s: failed to find book: %v\n", r.Method, r.URL.Path, err)
-		http.Error(w, "Book not found", http.StatusNotFound)
-		return
-	}
-	b.Public = *update.Public
-
-	err = updateBook(*b)
-	if err != nil {
-		log.Printf("%s %s: failed to update book: %v\n", r.Method, r.URL.Path, err)
+	if err := updateBook(updated); err != nil {
+		// log.Printf("%s %s: failed to update book: %v\n", r.Method, r.URL.Path, err)
 		http.Error(w, "Failed to update book", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(b)
+	_ = json.NewEncoder(w).Encode(updated)
 }
 
 func loadBooks() error {
