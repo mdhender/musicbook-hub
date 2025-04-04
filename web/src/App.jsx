@@ -107,29 +107,58 @@ function App() {
                                 <>
                                     <LoginForm token={token} login={login} logout={logout}/>
 
-                                    {token && <AddBookForm token={token} setBooks={setBooks} />}
+                                    {/* Show AddBookForm only when authenticated */}
+                                    {token ? (
+                                        <>
+                                            <AddBookForm token={token} setBooks={setBooks}/>
+                                            <div className="mt-4 mb-4">
+                                                <Link
+                                                    to="/books"
+                                                    className="inline-block hover:bg-blue-700 text-black font-medium py-2 px-4 rounded"
+                                                >
+                                                    View All Books
+                                                </Link>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {loading && (
+                                                <p className="text-gray-500 italic">Loading books...</p>
+                                            )}
+                                            {error && (
+                                                <p className="text-red-600">
+                                                    Error loading books. Please try again later.
+                                                </p>
+                                            )}
 
-                                    {/* Status Messages */}
-                                    <div className="space-y-2">
-                                        {loading && (
-                                            <p className="text-gray-500 italic">Loading books...</p>
-                                        )}
-                                        {error && (
-                                            <p className="text-red-600">
-                                                Error loading books. Please try again later.
-                                            </p>
-                                        )}
-
-                                        <BookList
-                                            books={books}
-                                            loading={loading}
-                                            error={error}
-                                            token={token}
-                                            toggleVisibility={toggleVisibility}
-                                            deleteBook={deleteBook}
-                                        />
-                                    </div>
+                                            <BookList
+                                                books={books}
+                                                loading={loading}
+                                                error={error}
+                                                token={token}
+                                                toggleVisibility={toggleVisibility}
+                                                deleteBook={deleteBook}
+                                            />
+                                        </div>
+                                    )}
                                 </>
+                            }
+                        />
+                        <Route
+                            path="/books"
+                            element={
+                                token ? (
+                                    <BookList
+                                        books={books}
+                                        loading={loading}
+                                        error={error}
+                                        token={token}
+                                        toggleVisibility={toggleVisibility}
+                                        deleteBook={deleteBook}
+                                    />
+                                ) : (
+                                    <Navigate to="/" replace />  // Redirect to home if not authenticated
+                                )
                             }
                         />
                         <Route path="/books/:id" element={<BookDetail token={token}/>}/>
