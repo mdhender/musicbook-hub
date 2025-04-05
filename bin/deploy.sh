@@ -4,6 +4,13 @@
 set -e
 ############################################################################
 #
+NODE_VERSION=$( node -v )
+if [ "${NODE_VERSION}" != "v23.11.0" ]; then
+  echo "error: expected node version v23.11.0"
+  exit 2
+fi
+############################################################################
+#
 USER=mbooks
 HOST=damned.dev
 REMOTE_WEB_DIR=/var/www/damned.dev
