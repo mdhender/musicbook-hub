@@ -16,7 +16,8 @@ backend:
 # Dev mode: runs both frontend and backend locally
 dev:
 	@echo "Starting Go backend and React frontend..."
-	@make -j2 run-backend run-frontend
+	@echo make -j2 run-backend run-frontend
+	cd web && npm run dev
 
 run-backend:
 	cd . && go run main.go
