@@ -36,14 +36,14 @@ create table books_new
 );
 
 -- Copy data from old table
-insert into books_new (id, title, author, instrument, condition, format, description, public)
+insert into books_new (id, title, author, condition, format, description, instrument, public)
 select id,
        title,
        author,
-       instrument,
        condition,
-       format,
+       '',
        description,
+       instrument,
        public
 from books;
 
