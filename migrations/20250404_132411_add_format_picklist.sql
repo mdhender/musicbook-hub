@@ -21,19 +21,44 @@ values ('sheet music', 'Single piece or short folio, typically softcover and int
        ('reference book',
         'Non-fiction book used for lookups or guidance, such as dictionaries, style guides, or API references');
 
-alter table books
-    add column format text not null default '';
-alter table books
-    add column created_at datetime not null default CURRENT_TIMESTAMP;
-alter table books
-    add column updated_at datetime not null default CURRENT_TIMESTAMP;
+create table books_new
+(
+    id          integer primary key autoincrement,
+    title       text     not null,
+    author      text     not null default '',
+    condition   text     not null default '',
+    format      text     not null default '',
+    description text     not null default '',
+    instrument  text     not null default '',
+    public      integer  not null default 0 check (public in (0, 1)),
+    created_at  datetime not null default current_timestamp,
+    updated_at  datetime not null default current_timestamp
+);
+
+-- Copy data from old table
+insert into books_new (id, title, author, instrument, condition, format, description, public)
+select id,
+       title,
+       author,
+       instrument,
+       condition,
+       format,
+       description,
+       public
+from books;
+
+-- drop old table and rename
+drop table books;
+alter table books_new
+    rename to books;
 
 create trigger if not exists set_updated_at
-    after update on books
+    after update
+    on books
     for each row
 begin
     update books set updated_at = CURRENT_TIMESTAMP where id = old.id;
 end;
 
-create index if not exists idx_books_format on books(format);
+create index if not exists idx_books_format on books (format);
 
