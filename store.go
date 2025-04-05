@@ -95,3 +95,74 @@ insert into format_picklist(format, description) values('programming book', 'Tec
 insert into format_picklist(format, description) values('textbook',         'Educational book intended for academic study, often includes theory and exercises');
 insert into format_picklist(format, description) values('reference book',   'Non-fiction book used for lookups or guidance, such as dictionaries, style guides, or API references');
 */
+
+func addBook(book Book) (int64, error) {
+	result, err := db.Exec(`
+		INSERT INTO books (title, author, instrument, condition, description, public)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		book.Title, book.Author, book.Instrument, book.Condition, book.Description, book.Public,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+func updateBook(book Book) error {
+	log.Printf("updateBook: %+v\n", book)
+	_, err := db.Exec(`
+		UPDATE books
+		SET title = ?, author = ?, instrument = ?, condition = ?, description = ?, public = ?
+		WHERE id = ?`,
+		book.Title, book.Author, book.Instrument, book.Condition, book.Description, book.Public, book.ID,
+	)
+	return err
+}
+
+func deleteBook(id int64) error {
+	_, err := db.Exec(`DELETE FROM books WHERE id = ?`, id)
+	return err
+}
+
+func listBooks(isAuth bool) ([]Book, error) {
+	rows, err := db.Query(`SELECT id, title, author, instrument, condition, description, public FROM books`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var books []Book
+	for rows.Next() {
+		var b Book
+		var public int64
+		err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.Instrument, &b.Condition, &b.Description, &public)
+		if err != nil {
+			return nil, err
+		}
+		b.Public = public == 1
+		// filter books based on public field or if authenticated
+		if b.Public || isAuth {
+			books = append(books, b)
+		}
+	}
+	if books == nil {
+		books = []Book{}
+	}
+	return books, rows.Err()
+}
+
+func getBookByID(id int64) (*Book, error) {
+	row := db.QueryRow(`SELECT id, title, author, instrument, condition, description, public FROM books WHERE id = ?`, id)
+
+	var b Book
+	var public int64
+	err := row.Scan(&b.ID, &b.Title, &b.Author, &b.Instrument, &b.Condition, &b.Description, &public)
+	if err == sql.ErrNoRows {
+		return nil, nil // not found
+	}
+	if err != nil {
+		return nil, err
+	}
+	b.Public = public == 1
+	return &b, nil
+}
