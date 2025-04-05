@@ -73,14 +73,9 @@ func postBooksHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(b)
 }
 
-func bookHandler(w http.ResponseWriter, r *http.Request) {
+func deleteBookHandler(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
-
-	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 
 	if !isAuthenticated(r) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
