@@ -1,6 +1,7 @@
 .DS_Store
 .idea/
 books.db
+books.db,*
 bookstore.json
 magic-keys.json
 node_modules/

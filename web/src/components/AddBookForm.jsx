@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Michael D Henderson. All rights reserved.
-
+// src/components/AddBookForm.jsx
 // Copyright (c) 2025 Michael D Henderson. All rights reserved.
 
 import { useRef, useState } from "react";
-
-import {API_URL} from "../config.js";
+import { API_URL } from "../config.js";
+import { formatOptions } from "../formatOptions.js";
 
 export default function AddBookForm({ token, setBooks }) {
     const titleRef = useRef();
@@ -15,6 +14,7 @@ export default function AddBookForm({ token, setBooks }) {
         instrument: "",
         condition: "",
         description: "",
+        format: "",
         public: false,
     });
 
@@ -44,7 +44,6 @@ export default function AddBookForm({ token, setBooks }) {
             .then((newBook) => {
                 setBooks((prev) => [...prev, newBook]);
 
-                // ✅ Keep last instrument, reset form
                 const lastInstrument = form.instrument;
                 setForm({
                     title: "",
@@ -52,10 +51,10 @@ export default function AddBookForm({ token, setBooks }) {
                     instrument: lastInstrument,
                     condition: "",
                     description: "",
+                    format: "",
                     public: false,
                 });
 
-                // ✅ Refocus the title field
                 titleRef.current?.focus();
             })
             .catch((err) => alert("Failed to add book: " + err.message));
@@ -100,6 +99,20 @@ export default function AddBookForm({ token, setBooks }) {
                 value={form.description}
                 onChange={handleInput}
             />
+            <select
+                name="format"
+                value={form.format}
+                onChange={handleInput}
+                className="w-full p-2 border rounded"
+                required
+            >
+                <option value="">Select format</option>
+                {formatOptions.map((opt) => (
+                    <option key={opt.format} value={opt.format}>
+                        {opt.format}
+                    </option>
+                ))}
+            </select>
             <label className="flex items-center space-x-2">
                 <input
                     type="checkbox"

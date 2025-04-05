@@ -1,3 +1,6 @@
+// main.go
+// Copyright (c) 2025 Michael D Henderson. All rights reserved.
+
 package main
 
 import (
@@ -19,7 +22,7 @@ func main() {
 		log.Fatalf("failed to load magic keys: %v", err)
 	}
 
-	if err := loadBooks(); err != nil {
+	if err := openStore(); err != nil {
 		log.Fatalf("%s: failed to load: %v", dbPath, err)
 	} else {
 		log.Printf("%s: ✅ loaded books store\n", dbPath)
@@ -37,7 +40,7 @@ func main() {
 	mux.HandleFunc("GET /api/books/export", booksExportHandler)
 	mux.HandleFunc("GET /api/books/{id}", getBookByIDHandler)
 	mux.HandleFunc("DELETE /api/books/{id}", requireAuth(deleteBookHandler)) // protected delete
-	mux.HandleFunc("PATCH /api/books/{id}", requireAuth(updateBookHandler))
+	mux.HandleFunc("PATCH /api/books/{id}", requireAuth(patchBookHandler))
 
 	mux.HandleFunc("OPTIONS /{rest...}", func(w http.ResponseWriter, r *http.Request) {
 		// log.Printf("%s %s: pre-flight\n", r.Method, r.URL.Path)

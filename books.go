@@ -4,7 +4,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	_ "modernc.org/sqlite"
 	"net/http"
 	"strconv"
@@ -14,10 +13,13 @@ type Book struct {
 	ID          int64  `json:"id"`
 	Title       string `json:"title"`
 	Author      string `json:"author"`
-	Instrument  string `json:"instrument"`
 	Condition   string `json:"condition"`
+	Format      string `json:"format"`
 	Description string `json:"description"`
+	Instrument  string `json:"instrument"`
 	Public      bool   `json:"public"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
 }
 
 type BookListResponse struct {
@@ -150,14 +152,10 @@ func booksExportHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(books)
 }
 
-func updateBookHandler(w http.ResponseWriter, r *http.Request) {
+func patchBookHandler(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
-	if r.Method != http.MethodPatch {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	if !isAuthenticated(r) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -169,42 +167,27 @@ func updateBookHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid book ID", http.StatusBadRequest)
 		return
 	}
-	// log.Printf("%s %s: id %q: %d\n", r.Method, r.URL.Path, idStr, id)
 
-	var updated struct {
-		Public *bool `json:"public"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
+	var book Book
+	if err := json.NewDecoder(r.Body).Decode(&book); err != nil {
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
-	if updated.Public == nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
-		return
-	}
-	// log.Printf("updated: %+v\n", updated)
-	// fetch the book from the database
-	book, err := getBookByID(id)
-	if err != nil {
-		log.Printf("%s %s: failed to get book: %v\n", r.Method, r.URL.Path, err)
-		http.Error(w, "Book not found", http.StatusNotFound)
-		return
-	} else if book == nil {
-		// log.Printf("%s %s: failed to find book\n", r.Method, r.URL.Path)
-		http.Error(w, "Book not found", http.StatusNotFound)
-		return
-	}
-	// log.Printf("fetch: book %+v\n", *book)
-	book.Public = *updated.Public
-	// log.Printf("updated: book %+v\n", *book)
+	book.ID = id // override to ensure correct row
 
-	if err := updateBook(*book); err != nil {
-		// log.Printf("%s %s: failed to update book: %v\n", r.Method, r.URL.Path, err)
+	if err := updateBook(book); err != nil {
 		http.Error(w, "Failed to update book", http.StatusInternalServerError)
+		return
+	}
+
+	// Return updated book with fresh timestamps
+	updatedBook, err := getBookByID(id)
+	if err != nil {
+		http.Error(w, "Could not fetch updated book", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(book)
+	_ = json.NewEncoder(w).Encode(updatedBook)
 }

@@ -1,11 +1,16 @@
+// store.go
 // Copyright (c) 2025 Michael D Henderson. All rights reserved.
 
 package main
 
 import (
 	"database/sql"
+	"embed"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
+	"sort"
 )
 
 const dbPath = "books.db"
@@ -14,94 +19,158 @@ var (
 	db *sql.DB
 )
 
-func loadBooks() error {
-	// Check if the DB file exists
-	_, err := os.Stat(dbPath)
-	isNew := os.IsNotExist(err)
+func openStore() error {
+	// Check if database file exists before opening
+	if _, err := os.Stat(dbPath); err == nil {
+		// Database exists, create a backup
+		log.Printf("backing up database file\n")
 
+		fileInfo, err := os.Stat(dbPath)
+		if err != nil {
+			log.Fatalf("error: failed to get file info for backup: %v", err)
+		}
+		// Format timestamp in UTC as YYYYMMDDHH24MISS
+		modTime := fileInfo.ModTime().UTC()
+		timestamp := modTime.Format("20060102150405")
+		backupPath := dbPath + "," + timestamp
+
+		// Copy the database file to create backup
+		srcFile, err := os.Open(dbPath)
+		if err != nil {
+			log.Fatalf("error: failed to open source file for backup: %v", err)
+		}
+		defer srcFile.Close()
+
+		// todo: don't overwrite existing backup?
+		dstFile, err := os.Create(backupPath)
+		if err != nil {
+			log.Fatalf("error: failed to create backup file: %v", err)
+		}
+		defer dstFile.Close()
+
+		if _, err = io.Copy(dstFile, srcFile); err != nil {
+			log.Fatalf("error: failed to copy database for backup: %v", err)
+		}
+		log.Printf("created database backup: %s", backupPath)
+	}
+
+	var err error
 	db, err = sql.Open("sqlite", dbPath)
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
 
-	if isNew {
-		if err := createSchema(); err != nil {
-			log.Fatalf("failed to create schema: %v", err)
-		}
-		log.Println("created new database and schema")
+	// Apply any pending migrations
+	if err := migrateSchema(); err != nil {
+		log.Fatalf("failed to migrate schema: %v", err)
 	}
 
-	return nil
-}
-
-func createSchema() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS books (
-		id          INTEGER PRIMARY KEY AUTOINCREMENT,
-		title       TEXT NOT NULL,
-		author      TEXT NOT NULL DEFAULT '',
-		instrument  TEXT NOT NULL DEFAULT '',
-		condition   TEXT NOT NULL DEFAULT '',
-		description TEXT NOT NULL DEFAULT '',
-		public      INTEGER NOT NULL DEFAULT 0 CHECK (public in (0, 1))
-	);
-	CREATE TABLE IF NOT EXISTS format_picklist (
-		id          INTEGER PRIMARY KEY AUTOINCREMENT,
-	    format      TEXT NOT NULL,
-	    description TEXT NOT NULL
-	);
-	`
-	_, err := db.Exec(schema)
-	if err != nil {
-		return err
-	}
-	// Populate the format_picklist table with data from formatPickList map
-	for format, description := range formatPickList {
-		_, err := db.Exec(`
-			INSERT OR IGNORE INTO format_picklist (format, description)
-			VALUES (?, ?)`,
-			format, description)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 var (
-	formatPickList = map[string]string{
-		"sheet music":      "Single piece or short folio, typically softcover and intended for performance",
-		"music book":       "Bound book of sheet music or exercises, such as method books, anthologies, or collections",
-		"method book":      "Instructional book for learning an instrument, often organized by level",
-		"score":            "Full musical score for ensembles, orchestras, or chamber music",
-		"lead sheet":       "Single-line melody with chords, often used in jazz or pop music",
-		"fake book":        "Gig-style book with hundreds of lead sheets for performance",
-		"manuscript":       "Blank staff paper or note-taking formats for composers and students",
-		"programming book": "Technical or instructional book focused on coding, software, or computer science topics",
-		"textbook":         "Educational book intended for academic study, often includes theory and exercises",
-		"reference book":   "Non-fiction book used for lookups or guidance, such as dictionaries, style guides, or API references",
-	}
+	//go:embed migrations/*.sql
+	migrationsFS embed.FS
 )
 
-/*
-insert into format_picklist(format, description) values('sheet music',      'Single piece or short folio, typically softcover and intended for performance');
-insert into format_picklist(format, description) values('music book',       'Bound book of sheet music or exercises, such as method books, anthologies, or collections');
-insert into format_picklist(format, description) values('method book',      'Instructional book for learning an instrument, often organized by level');
-insert into format_picklist(format, description) values('score',            'Full musical score for ensembles, orchestras, or chamber music');
-insert into format_picklist(format, description) values('lead sheet',       'Single-line melody with chords, often used in jazz or pop music');
-insert into format_picklist(format, description) values('fake book',        'Gig-style book with hundreds of lead sheets for performance');
-insert into format_picklist(format, description) values('manuscript',       'Blank staff paper or note-taking formats for composers and students');
-insert into format_picklist(format, description) values('programming book', 'Technical or instructional book focused on coding, software, or computer science topics');
-insert into format_picklist(format, description) values('textbook',         'Educational book intended for academic study, often includes theory and exercises');
-insert into format_picklist(format, description) values('reference book',   'Non-fiction book used for lookups or guidance, such as dictionaries, style guides, or API references');
-*/
+func migrateSchema() error {
+	// Create migrations table if it doesn't exist
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS migrations (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			filename TEXT NOT NULL UNIQUE,
+			applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		log.Fatalf("failed to create migrations table: %v", err)
+		return err
+	}
+
+	// Get list of migration files
+	entries, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
+		log.Fatalf("failed to read migrations directory: %v", err)
+		return err
+	}
+
+	// Sort migration files by name (timestamp prefix ensures correct order)
+	var migrationFiles []string
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
+			migrationFiles = append(migrationFiles, entry.Name())
+		}
+	}
+	sort.Strings(migrationFiles)
+
+	// Begin transaction for all migrations
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatalf("failed to begin transaction: %v", err)
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Check which migrations have already been applied
+	for _, filename := range migrationFiles {
+		var exists bool
+		err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM migrations WHERE filename = ?)", filename).Scan(&exists)
+		if err != nil {
+			log.Fatalf("failed to check if migration exists: %v", err)
+			return err
+		}
+
+		// Skip if migration has already been applied
+		if exists {
+			log.Printf("Migration %s already applied, skipping", filename)
+			continue
+		}
+
+		// Read and apply the migration file
+		migrationSQL, err := migrationsFS.ReadFile(filepath.Join("migrations", filename))
+		if err != nil {
+			log.Fatalf("failed to read migration file %s: %v", filename, err)
+			return err
+		}
+
+		// Execute the migration
+		_, err = tx.Exec(string(migrationSQL))
+		if err != nil {
+			log.Fatalf("failed to apply migration %s: %v", filename, err)
+			return err
+		}
+
+		// Record the migration as applied
+		_, err = tx.Exec("INSERT INTO migrations (filename) VALUES (?)", filename)
+		if err != nil {
+			log.Fatalf("failed to record migration %s: %v", filename, err)
+			return err
+		}
+
+		log.Printf("Successfully applied migration: %s", filename)
+	}
+
+	// Commit all migrations
+	if err = tx.Commit(); err != nil {
+		log.Fatalf("failed to commit migrations: %v", err)
+		return err
+	}
+
+	log.Println("Schema migration completed successfully")
+	return nil
+}
 
 func addBook(book Book) (int64, error) {
 	result, err := db.Exec(`
-		INSERT INTO books (title, author, instrument, condition, description, public)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		book.Title, book.Author, book.Instrument, book.Condition, book.Description, book.Public,
+	INSERT INTO books (title, author, condition, format, description, instrument, public)
+	VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		book.Title, book.Author, book.Condition, book.Format, book.Description, book.Instrument, book.Public,
 	)
+
 	if err != nil {
 		return 0, err
 	}
@@ -112,9 +181,9 @@ func updateBook(book Book) error {
 	// log.Printf("updateBook: %+v\n", book)
 	_, err := db.Exec(`
 		UPDATE books
-		SET title = ?, author = ?, instrument = ?, condition = ?, description = ?, public = ?
+		SET title = ?, author = ?, condition = ?, format = ?, description = ?, instrument = ?, public = ?
 		WHERE id = ?`,
-		book.Title, book.Author, book.Instrument, book.Condition, book.Description, book.Public, book.ID,
+		book.Title, book.Author, book.Condition, book.Format, book.Description, book.Instrument, book.Public, book.ID,
 	)
 	return err
 }
@@ -125,7 +194,7 @@ func deleteBook(id int64) error {
 }
 
 func listBooks(isAuth bool) ([]Book, error) {
-	rows, err := db.Query(`SELECT id, title, author, instrument, condition, description, public FROM books`)
+	rows, err := db.Query(`SELECT id, title, author, condition, format, description, instrument, public, created_at, updated_at FROM books`)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +204,7 @@ func listBooks(isAuth bool) ([]Book, error) {
 	for rows.Next() {
 		var b Book
 		var public int64
-		err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.Instrument, &b.Condition, &b.Description, &public)
+		err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.Condition, &b.Format, &b.Description, &b.Instrument, &public, &b.CreatedAt, &b.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -152,11 +221,11 @@ func listBooks(isAuth bool) ([]Book, error) {
 }
 
 func getBookByID(id int64) (*Book, error) {
-	row := db.QueryRow(`SELECT id, title, author, instrument, condition, description, public FROM books WHERE id = ?`, id)
+	row := db.QueryRow(`SELECT id, title, author, condition, format, description, instrument, public, created_at, updated_at FROM books WHERE id = ?`, id)
 
 	var b Book
 	var public int64
-	err := row.Scan(&b.ID, &b.Title, &b.Author, &b.Instrument, &b.Condition, &b.Description, &public)
+	err := row.Scan(&b.ID, &b.Title, &b.Author, &b.Condition, &b.Format, &b.Description, &b.Instrument, &public, &b.CreatedAt, &b.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil // not found
 	}

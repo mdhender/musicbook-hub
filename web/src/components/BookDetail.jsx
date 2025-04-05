@@ -1,9 +1,10 @@
+// src/components/BookDetail.jsx
 // Copyright (c) 2025 Michael D Henderson. All rights reserved.
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
-import {API_URL} from "../config.js";
+import { API_URL } from "../config.js";
 
 export default function BookDetail({ token }) {
     const { id } = useParams();
@@ -54,6 +55,7 @@ export default function BookDetail({ token }) {
             {book.instrument && <div><strong>Instrument:</strong> {book.instrument}</div>}
             {book.condition && <div><strong>Condition:</strong> {book.condition}</div>}
             {book.description && <div><strong>Description:</strong> {book.description}</div>}
+            {book.format && <div><strong>Format:</strong> {book.format}</div>}
 
             <div>
                 <strong>Visibility:</strong>{" "}
@@ -65,23 +67,34 @@ export default function BookDetail({ token }) {
             </div>
 
             {token && (
-                <div className="flex space-x-4 pt-4">
-                    <button
-                        onClick={handleEdit}
-                        className="bg-yellow-500 font-semibold px-4 py-2 rounded hover:bg-yellow-600 focus:outline-none"
-                    >
-                        Edit
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
-                    >
-                        Delete
-                    </button>
-                </div>
+                <>
+                    {book.created_at && (
+                        <div className="text-sm text-gray-500">
+                            <strong>Created:</strong> {new Date(book.created_at).toLocaleString()}
+                        </div>
+                    )}
+                    {book.updated_at && (
+                        <div className="text-sm text-gray-500">
+                            <strong>Updated:</strong> {new Date(book.updated_at).toLocaleString()}
+                        </div>
+                    )}
+
+                    <div className="flex space-x-4 pt-4">
+                        <button
+                            onClick={handleEdit}
+                            className="bg-yellow-500 font-semibold px-4 py-2 rounded hover:bg-yellow-600 focus:outline-none"
+                        >
+                            Edit
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                </>
             )}
         </div>
     );
 }
-
-//   className="bg-yellow-500 text-white font-semibold px-4 py-2 rounded hover:bg-yellow-600 focus:outline-none"

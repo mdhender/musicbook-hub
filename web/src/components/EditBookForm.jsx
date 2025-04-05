@@ -1,9 +1,11 @@
+// src/components/EditBookForm.jsx
 // Copyright (c) 2025 Michael D Henderson. All rights reserved.
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
-import {API_URL} from "../config.js";
+import { API_URL } from "../config.js";
+import { formatOptions } from "../formatOptions.js";
 
 export default function EditBookForm({ token }) {
     const { id } = useParams();
@@ -93,6 +95,19 @@ export default function EditBookForm({ token }) {
                     value={form.description}
                     onChange={handleInput}
                 />
+                <select
+                    name="format"
+                    value={form.format || ""}
+                    onChange={handleInput}
+                    className="w-full p-2 border rounded"
+                >
+                    <option value="">Select format</option>
+                    {formatOptions.map((opt) => (
+                        <option key={opt.format} value={opt.format}>
+                            {opt.format}
+                        </option>
+                    ))}
+                </select>
                 <label className="flex items-center space-x-2">
                     <input
                         type="checkbox"
