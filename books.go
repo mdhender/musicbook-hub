@@ -100,7 +100,7 @@ func deleteBookHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func bookByIDHandler(w http.ResponseWriter, r *http.Request) {
+func getBookByIDHandler(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("%s %s: entered\n", r.Method, r.URL.Path)
 	enableCORS(w)
 
@@ -182,7 +182,7 @@ func updateBookHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
-	log.Printf("updated: %+v\n", updated)
+	// log.Printf("updated: %+v\n", updated)
 	// fetch the book from the database
 	book, err := getBookByID(id)
 	if err != nil {
@@ -194,9 +194,9 @@ func updateBookHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Book not found", http.StatusNotFound)
 		return
 	}
-	log.Printf("fetch: book %+v\n", *book)
+	// log.Printf("fetch: book %+v\n", *book)
 	book.Public = *updated.Public
-	log.Printf("updated: book %+v\n", *book)
+	// log.Printf("updated: book %+v\n", *book)
 
 	if err := updateBook(*book); err != nil {
 		// log.Printf("%s %s: failed to update book: %v\n", r.Method, r.URL.Path, err)

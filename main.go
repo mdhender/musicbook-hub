@@ -35,7 +35,7 @@ func main() {
 	mux.HandleFunc("GET /api/books", getBooksHandler)                // public read
 	mux.HandleFunc("POST /api/books", requireAuth(postBooksHandler)) // protected write
 	mux.HandleFunc("GET /api/books/export", booksExportHandler)
-	mux.HandleFunc("GET /api/books/{id}", bookByIDHandler)
+	mux.HandleFunc("GET /api/books/{id}", getBookByIDHandler)
 	mux.HandleFunc("DELETE /api/books/{id}", requireAuth(deleteBookHandler)) // protected delete
 	mux.HandleFunc("PATCH /api/books/{id}", requireAuth(updateBookHandler))
 

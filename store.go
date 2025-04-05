@@ -109,7 +109,7 @@ func addBook(book Book) (int64, error) {
 }
 
 func updateBook(book Book) error {
-	log.Printf("updateBook: %+v\n", book)
+	// log.Printf("updateBook: %+v\n", book)
 	_, err := db.Exec(`
 		UPDATE books
 		SET title = ?, author = ?, instrument = ?, condition = ?, description = ?, public = ?
