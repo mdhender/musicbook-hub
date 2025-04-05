@@ -32,8 +32,8 @@ func main() {
 	mux.HandleFunc("GET /api/me", requireAuth(meHandler))
 
 	// Books endpoints
-	mux.HandleFunc("GET /api/books", booksHandler)               // public read
-	mux.HandleFunc("POST /api/books", requireAuth(booksHandler)) // protected write
+	mux.HandleFunc("GET /api/books", getBooksHandler)                // public read
+	mux.HandleFunc("POST /api/books", requireAuth(postBooksHandler)) // protected write
 	mux.HandleFunc("GET /api/books/export", booksExportHandler)
 	mux.HandleFunc("GET /api/books/{id}", bookByIDHandler)
 	mux.HandleFunc("DELETE /api/books/{id}", requireAuth(bookHandler)) // protected delete
