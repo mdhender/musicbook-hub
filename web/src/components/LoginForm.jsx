@@ -13,7 +13,7 @@ export default function LoginForm({ token, login, logout }) {
                 >
                     <input
                         name="uuid"
-                        placeholder="Enter magic UUID"
+                        placeholder="Enter credentials"
                         className="p-2 border mr-2 w-2/3"
                     />
                     <button
