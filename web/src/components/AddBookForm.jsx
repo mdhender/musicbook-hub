@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Michael D Henderson. All rights reserved.
 
 import { useRef, useState } from "react";
+import Button from "./Button";
 import { API_URL } from "../config.js";
 import { formatOptions } from "../formatOptions.js";
 
@@ -122,12 +123,7 @@ export default function AddBookForm({ token, setBooks }) {
                 />
                 <span>Public</span>
             </label>
-            <button
-                className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
-                type="submit"
-            >
-                Add Book
-            </button>
+            <Button type="submit" variant="blue">Add Book</Button>
         </form>
     );
 }

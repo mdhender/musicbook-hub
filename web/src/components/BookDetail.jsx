@@ -1,21 +1,23 @@
 // src/components/BookDetail.jsx
 // Copyright (c) 2025 Michael D Henderson. All rights reserved.
 
-import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import {useEffect, useState} from "react";
+import {Link, useNavigate, useParams} from "react-router-dom";
 
-import { API_URL } from "../config.js";
+import {API_URL} from "../config.js";
+import Button from "./Button";
+import PublicToggle from "./PublicToggle";
 
-export default function BookDetail({ token }) {
-    const { id } = useParams();
+export default function BookDetail({token}) {
+    const {id} = useParams();
     const navigate = useNavigate();
     const [book, setBook] = useState(null);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const headers = token ? {Authorization: `Bearer ${token}`} : {};
 
-        fetch(`${API_URL}/${id}`, { headers })
+        fetch(`${API_URL}/${id}`, {headers})
             .then(res => {
                 if (!res.ok) throw new Error("Book not found or not authorized");
                 return res.json();
@@ -57,14 +59,7 @@ export default function BookDetail({ token }) {
             {book.description && <div><strong>Description:</strong> {book.description}</div>}
             {book.format && <div><strong>Format:</strong> {book.format}</div>}
 
-            <div>
-                <strong>Visibility:</strong>{" "}
-                {book.public ? (
-                    <span className="text-green-600 font-semibold">🌍 Public</span>
-                ) : (
-                    <span className="text-red-600 font-semibold">🔒 Private</span>
-                )}
-            </div>
+            <PublicToggle isPublic={book.public}/>
 
             {token && (
                 <>
@@ -80,18 +75,12 @@ export default function BookDetail({ token }) {
                     )}
 
                     <div className="flex space-x-4 pt-4">
-                        <button
-                            onClick={handleEdit}
-                            className="bg-yellow-500 font-semibold px-4 py-2 rounded hover:bg-yellow-600 focus:outline-none"
-                        >
+                        <Button variant="ghost" onClick={handleEdit}>
                             Edit
-                        </button>
-                        <button
-                            onClick={handleDelete}
-                            className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
-                        >
+                        </Button>
+                        <Button variant="red" onClick={handleDelete}>
                             Delete
-                        </button>
+                        </Button>
                     </div>
                 </>
             )}

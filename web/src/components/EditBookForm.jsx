@@ -6,6 +6,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 
 import { API_URL } from "../config.js";
 import { formatOptions } from "../formatOptions.js";
+import Button from "./Button";
 
 export default function EditBookForm({ token }) {
     const { id } = useParams();
@@ -108,23 +109,22 @@ export default function EditBookForm({ token }) {
                         </option>
                     ))}
                 </select>
-                <label className="flex items-center space-x-2">
+
+                <label className="flex items-center space-x-2 text-gray-800 font-medium">
                     <input
                         type="checkbox"
                         name="public"
                         checked={form.public}
                         onChange={handleInput}
+                        className="h-4 w-4 accent-blue-600"
                     />
                     <span>Public</span>
                 </label>
 
                 <div className="flex space-x-4 pt-2">
-                    <button
-                        type="submit"
-                        className="bg-blue-600 font-semibold px-4 py-2 rounded hover:bg-blue-700"
-                    >
+                    <Button type="submit" variant="blue">
                         Save
-                    </button>
+                    </Button>
                     <Link
                         to={`/books/${id}`}
                         className="text-gray-600 underline px-4 py-2"
