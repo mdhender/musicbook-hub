@@ -4,8 +4,10 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"embed"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -23,7 +25,7 @@ func openStore() error {
 	// Check if database file exists before opening
 	if _, err := os.Stat(dbPath); err == nil {
 		// Database exists, create a backup
-		log.Printf("backing up database file\n")
+		log.Printf("backing up database file %s\n", dbPath)
 
 		fileInfo, err := os.Stat(dbPath)
 		if err != nil {
@@ -34,24 +36,47 @@ func openStore() error {
 		timestamp := modTime.Format("20060102150405")
 		backupPath := dbPath + "," + timestamp
 
-		// Copy the database file to create backup
-		srcFile, err := os.Open(dbPath)
-		if err != nil {
-			log.Fatalf("error: failed to open source file for backup: %v", err)
-		}
-		defer srcFile.Close()
+		// Check if backup file already exists
+		if _, err := os.Stat(backupPath); err == nil {
+			// Backup file exists, compare checksums
+			srcChecksum, err := calculateChecksum(dbPath)
+			if err != nil {
+				log.Fatalf("error: failed to calculate checksum for source file: %v", err)
+			}
 
-		// todo: don't overwrite existing backup?
-		dstFile, err := os.Create(backupPath)
-		if err != nil {
-			log.Fatalf("error: failed to create backup file: %v", err)
-		}
-		defer dstFile.Close()
+			backupChecksum, err := calculateChecksum(backupPath)
+			if err != nil {
+				log.Fatalf("error: failed to calculate checksum for existing backup: %v", err)
+			}
 
-		if _, err = io.Copy(dstFile, srcFile); err != nil {
-			log.Fatalf("error: failed to copy database for backup: %v", err)
+			if srcChecksum == backupChecksum {
+				log.Printf("existing backup %s has identical checksum, skipping backup", backupPath)
+			} else {
+				log.Printf("error: existing backup %s has different checksum", backupPath)
+				log.Printf("source checksum: %x", srcChecksum)
+				log.Printf("backup checksum: %x", backupChecksum)
+				log.Printf("timestamp: %s", timestamp)
+				log.Fatalf("backup conflict detected, manual intervention required")
+			}
+		} else {
+			// Backup file doesn't exist, create it
+			srcFile, err := os.Open(dbPath)
+			if err != nil {
+				log.Fatalf("error: failed to open source file for backup: %v", err)
+			}
+			defer srcFile.Close()
+
+			dstFile, err := os.Create(backupPath)
+			if err != nil {
+				log.Fatalf("error: failed to create backup file: %v", err)
+			}
+			defer dstFile.Close()
+
+			if _, err = io.Copy(dstFile, srcFile); err != nil {
+				log.Fatalf("error: failed to copy database for backup: %v", err)
+			}
+			log.Printf("created database backup: %s", backupPath)
 		}
-		log.Printf("created database backup: %s", backupPath)
 	}
 
 	var err error
@@ -66,6 +91,25 @@ func openStore() error {
 	}
 
 	return nil
+}
+
+// calculateChecksum computes the SHA-256 checksum of a file
+func calculateChecksum(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+
+	// Convert the byte slice to a hex string
+	checksum := hash.Sum(nil)
+
+	return fmt.Sprintf("%x", checksum), nil
 }
 
 var (
